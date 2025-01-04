@@ -8,8 +8,8 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 file_path = os.path.join(current_dir, 'recipes.csv')
 
 # Debugging: Check if the file path exists
-st.write("Current working directory:", os.getcwd())
-st.write("File path exists:", os.path.exists(file_path))
+# st.write("Current working directory:", os.getcwd())
+# st.write("File path exists:", os.path.exists(file_path))
 
 # Load and preprocess the dataset
 try:
