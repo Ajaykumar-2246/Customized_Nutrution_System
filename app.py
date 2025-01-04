@@ -168,10 +168,10 @@ st.title("Customized Nutrition System")
 
 # Input form
 with st.form(key='meal_plan_form'):
-    age = st.number_input("Enter your age:", min_value=2, max_value=120, step=1, value=25)
+    age = st.number_input("Enter your age:", min_value=2, max_value=120, step=1)
     gender = st.selectbox("Select your gender:", ["Male", "Female"], index=0)
-    weight = st.number_input("Enter your weight (kg):", min_value=10.0, max_value=300.0, step=0.1, value=70.0)
-    height = st.number_input("Enter your height (cm):", min_value=50.0, max_value=250.0, step=0.1, value=170.0)
+    weight = st.number_input("Enter your weight (kg):", min_value=10.0, max_value=300.0, step=0.1)
+    height = st.number_input("Enter your height (cm):", min_value=50.0, max_value=250.0, step=0.1)
     goal = st.selectbox("Select your goal:", ["Weight loss", "Maintenance", "Muscle gain"], index=1)
 
     submit_button = st.form_submit_button("Generate Meal Plan")
