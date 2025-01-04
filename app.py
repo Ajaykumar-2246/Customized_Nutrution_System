@@ -165,6 +165,10 @@ def visualize_meal_calories(meal_totals):
 
 # Streamlit App
 st.title("Customized Nutrition System")
+st.write("This app generates a personalized meal plan based on your dietary needs and preferences.")
+# Add two <> tags below the title
+st.write("Here you can view the sample meal plan along with details such as calories and macro breakdown.")
+
 
 # Input form
 with st.form(key='meal_plan_form'):
