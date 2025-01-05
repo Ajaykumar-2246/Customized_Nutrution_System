@@ -1,7 +1,6 @@
 import os
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 
 # Get current directory and construct the absolute file path for 'recipes.csv'
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -141,34 +140,13 @@ def generate_meal_plan(calorie_needs, data):
 
         meal_plan[meal] = selected_recipes  # Store the full dataframe for meal
 
-        # Calculate total calories for this meal
-        total_calories = (
-            selected_recipes["proteincontent"] * 4 +
-            selected_recipes["carbohydratecontent"] * 4 +
-            selected_recipes["saturatedfatcontent"] * 9
-        ).sum()
-        meal_totals[meal] = total_calories
-
-    return meal_plan, meal_totals
-
-# Visualize Calories Per Meal
-def visualize_meal_calories(meal_totals):
-    meals = list(meal_totals.keys())
-    calories = list(meal_totals.values())
-
-    plt.figure(figsize=(5, 3))  # Adjusted figure size
-    plt.bar(meals, calories, color=['blue', 'green', 'red'])
-    plt.xlabel("Meals", fontsize=6)  # Adjusted font size for x-axis
-    plt.ylabel("Calories", fontsize=6)  # Adjusted font size for y-axis
-    plt.title("Calories Per Meal", fontsize=6)  # Adjusted font size for title
-    st.pyplot(plt)
+    return meal_plan
 
 # Streamlit App
 st.title("Customized Nutrition System")
 st.write("This app generates a personalized meal plan based on your dietary needs and preferences.")
 # Add two <> tags below the title
 st.write("Here you can view the sample meal plan along with details such as calories and macro breakdown.")
-
 
 # Input form
 with st.form(key='meal_plan_form'):
@@ -185,7 +163,7 @@ bmi = calculate_bmi(weight, height)
 calorie_needs = calculate_calories(age, gender.lower(), weight, height, goal.lower())
 
 # Generate Meal Plan and Visualize Results
-meal_plan, meal_totals = generate_meal_plan(calorie_needs, data)
+meal_plan = generate_meal_plan(calorie_needs, data)
 
 # Always display results
 st.subheader(f"Your BMI is: {bmi:.2f}")
@@ -193,6 +171,3 @@ st.subheader("Generated Meal Plan")
 for meal, recipes in meal_plan.items():
     st.write(f"**{meal.capitalize()}**")
     st.table(recipes[["name"]].head(5).reset_index(drop=True))
-
-st.subheader("Calories Per Meal")
-visualize_meal_calories(meal_totals)
