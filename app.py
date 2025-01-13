@@ -1,6 +1,7 @@
 import os
 import streamlit as st
 import pandas as pd
+import random
 
 # Get current directory and construct the absolute file path for 'recipes.csv'
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -84,12 +85,23 @@ def calculate_calories(age, gender, weight, height, goal):
     else:
         return bmr  # Maintenance calories
 
-# Function to Calculate BMI
+# Function to Calculate BMI and Category
 def calculate_bmi(weight, height):
     # BMI Formula: weight (kg) / (height (m))^2
     height_m = height / 100  # Convert height to meters
     bmi = weight / (height_m ** 2)
-    return bmi
+
+    # BMI categories
+    if bmi < 18.5:
+        bmi_category = "Underweight"
+    elif 18.5 <= bmi < 24.9:
+        bmi_category = "Normal weight"
+    elif 25 <= bmi < 29.9:
+        bmi_category = "Overweight"
+    else:
+        bmi_category = "Obesity"
+
+    return bmi, bmi_category
 
 # Generate Meal Plan
 def generate_meal_plan(calorie_needs, data):
@@ -112,33 +124,44 @@ def generate_meal_plan(calorie_needs, data):
 
     # Generate meal plans
     meal_plan = {}
-    meal_totals = {}  # Store total calories for each meal
-    used_recipes = []  # List to store used recipe IDs for diversity across meals
+    used_recipes = set()  # Set to track used recipes and avoid duplication
+    recipe_usage_count = {}  # Dictionary to track how often each recipe has been used
 
     for meal, targets in macro_targets.items():
-        # Calculate scores for recipes
+        # Calculate scores for recipes based on macros
         data["score"] = (
             abs(data["proteincontent"] - targets["protein"]) +
             abs(data["carbohydratecontent"] - targets["carbs"]) +
             abs(data["saturatedfatcontent"] - targets["fat"])
         )
 
-        # Select top recipes for the meal
-        selected_recipes = data.sort_values("score").head(6)  # Select 5-6 items per meal
+        # Select a larger pool of recipes for diversity
+        potential_recipes = data.sort_values("score").head(20)  # Top 20 recipes for more variety
 
-        # Remove any recipes that have already been used in previous meals
-        selected_recipes = selected_recipes[~selected_recipes["recipeid"].isin(used_recipes)]
+        # Filter out already used recipes across meals
+        potential_recipes = potential_recipes[~potential_recipes["recipeid"].isin(used_recipes)]
 
-        # If fewer than 5 recipes remain, allow some overlap from previous meals
-        if selected_recipes.shape[0] < 5:
-            remaining_needed = 5 - selected_recipes.shape[0]
-            remaining_recipes = data[data["recipeid"].isin(used_recipes)].head(remaining_needed)
-            selected_recipes = pd.concat([selected_recipes, remaining_recipes])
+        # If fewer than 5 recipes are available, allow some overlap from previously used ones
+        if potential_recipes.shape[0] < 5:
+            remaining_needed = 5 - potential_recipes.shape[0]
+            # Randomly select recipes from already used ones to fill in the gap
+            additional_recipes = data[data["recipeid"].isin(used_recipes)].sample(remaining_needed)
+            potential_recipes = pd.concat([potential_recipes, additional_recipes])
+
+        # Track usage frequency across all meals
+        for recipe_id in potential_recipes["recipeid"]:
+            recipe_usage_count[recipe_id] = recipe_usage_count.get(recipe_id, 0) + 1
+
+        # Filter out recipes that have already been used too many times across meals
+        potential_recipes = potential_recipes[potential_recipes["recipeid"].map(lambda x: recipe_usage_count[x] <= 2)]
+
+        # Randomly shuffle selected recipes to ensure variety
+        selected_recipes = potential_recipes.sample(n=5, random_state=42)
 
         # Add selected recipes' IDs to the used list
-        used_recipes.extend(selected_recipes["recipeid"].tolist())
+        used_recipes.update(selected_recipes["recipeid"].tolist())
 
-        meal_plan[meal] = selected_recipes  # Store the full dataframe for meal
+        meal_plan[meal] = selected_recipes  # Store the full dataframe for each meal
 
     return meal_plan
 
@@ -159,15 +182,20 @@ with st.form(key='meal_plan_form'):
     submit_button = st.form_submit_button("Generate Meal Plan")
 
 # Calculate BMI and Calorie Needs based on input or defaults
-bmi = calculate_bmi(weight, height)
-calorie_needs = calculate_calories(age, gender.lower(), weight, height, goal.lower())
+if submit_button:
+    bmi, bmi_category = calculate_bmi(weight, height)
+    calorie_needs = calculate_calories(age, gender.lower(), weight, height, goal.lower())
 
-# Generate Meal Plan and Visualize Results
-meal_plan = generate_meal_plan(calorie_needs, data)
+    # Generate Meal Plan and Visualize Results
+    meal_plan = generate_meal_plan(calorie_needs, data)
 
-# Always display results
-st.subheader(f"Your BMI is: {bmi:.2f}")
-st.subheader("Generated Meal Plan")
-for meal, recipes in meal_plan.items():
-    st.write(f"**{meal.capitalize()}**")
-    st.table(recipes[["name"]].head(5).reset_index(drop=True))
+    # Always display results
+    st.subheader(f"CALCULATED BMI")
+    st.markdown(f"Body Mass Index (BMI)")
+    st.markdown(f"<span style=' margin:0px; font-size:24px;'>{bmi:.2f} </span> kg/m²", unsafe_allow_html=True)
+    st.markdown(f"<span style='color:red'>{bmi_category}</span>", unsafe_allow_html=True)
+    
+    st.subheader("Generated Meal Plan")
+    for meal, recipes in meal_plan.items():
+        st.write(f"**{meal.capitalize()}**")
+        st.table(recipes[["name"]].head(5).reset_index(drop=True))
