@@ -191,9 +191,9 @@ if submit_button:
 
     # Always display results
     st.subheader(f"CALCULATED BMI")
-    st.markdown(f"Body Mass Index (BMI)")
-    st.markdown(f"<span style=' margin:0px; font-size:24px;'>{bmi:.2f} </span> kg/m²", unsafe_allow_html=True)
-    st.markdown(f"<span style='color:red'>{bmi_category}</span>", unsafe_allow_html=True)
+    st.markdown(f"<span style=' margin:0px; padding:0px; font-size:14px;'>Body Mass Index(BMI) </span>", unsafe_allow_html=True)
+    st.markdown(f"<span style=' margin:0px; font-size:26px;'>{bmi:.2f} </span> kg/m²", unsafe_allow_html=True)
+    st.markdown(f"<span style='color:red; font-size:20px; margin:0px'>{bmi_category}</span>", unsafe_allow_html=True)
     
     st.subheader("Generated Meal Plan")
     for meal, recipes in meal_plan.items():
