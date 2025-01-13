@@ -2,6 +2,7 @@ import os
 import streamlit as st
 import pandas as pd
 import random
+from sklearn.ensemble import RandomForestRegressor
 
 # Get current directory and construct the absolute file path for 'recipes.csv'
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -103,72 +104,56 @@ def calculate_bmi(weight, height):
 
     return bmi, bmi_category
 
-# Generate Meal Plan
-def generate_meal_plan(calorie_needs, data):
-    # Split calorie needs across meals
+# Function to train a Random Forest model to predict recipe score based on input features
+def train_random_forest_model(data):
+    # Feature columns (ignoring non-numeric columns for simplicity)
+    feature_columns = [
+        "calories", "fatcontent", "saturatedfatcontent", "cholesterolcontent",
+        "sodiumcontent", "carbohydratecontent", "fibercontent", "sugarcontent", "proteincontent"
+    ]
+    
+    # Target: a custom score or label for the meal plan (could be user-specific or randomized for now)
+    target = data["calories"]  # You could customize the target based on specific goals
+
+    # Train Random Forest Regressor model
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+    model.fit(data[feature_columns], target)
+    return model
+
+# Generate Meal Plan using Random Forest for predictions
+def generate_meal_plan_rf(calorie_needs, data, model):
     meal_calories = {
         "breakfast": calorie_needs * 0.3,  # 30% for breakfast
         "lunch": calorie_needs * 0.4,      # 40% for lunch
         "dinner": calorie_needs * 0.3      # 30% for dinner
     }
 
-    # Define macro targets per meal
-    macro_targets = {
-        meal: {
-            "protein": (calories * 0.2) / 4,  # 20% protein
-            "carbs": (calories * 0.5) / 4,   # 50% carbs
-            "fat": (calories * 0.3) / 9      # 30% fat
-        }
-        for meal, calories in meal_calories.items()
-    }
-
-    # Generate meal plans
     meal_plan = {}
-    used_recipes = set()  # Set to track used recipes and avoid duplication
-    recipe_usage_count = {}  # Dictionary to track how often each recipe has been used
+    used_recipes = set()
 
-    for meal, targets in macro_targets.items():
-        # Calculate scores for recipes based on macros
-        data["score"] = (
-            abs(data["proteincontent"] - targets["protein"]) +
-            abs(data["carbohydratecontent"] - targets["carbs"]) +
-            abs(data["saturatedfatcontent"] - targets["fat"])
-        )
+    for meal, target_calories in meal_calories.items():
+        # Predict recipe score using Random Forest
+        data["predicted_score"] = model.predict(data[numeric_columns])
 
-        # Select a larger pool of recipes for diversity
-        potential_recipes = data.sort_values("score").head(20)  # Top 20 recipes for more variety
+        # Select top recipes based on predicted score
+        top_recipes = data.sort_values("predicted_score", ascending=False).head(10)
 
-        # Filter out already used recipes across meals
-        potential_recipes = potential_recipes[~potential_recipes["recipeid"].isin(used_recipes)]
+        # Avoid duplicate recipes across meals
+        top_recipes = top_recipes[~top_recipes["recipeid"].isin(used_recipes)]
 
-        # If fewer than 5 recipes are available, allow some overlap from previously used ones
-        if potential_recipes.shape[0] < 5:
-            remaining_needed = 5 - potential_recipes.shape[0]
-            # Randomly select recipes from already used ones to fill in the gap
-            additional_recipes = data[data["recipeid"].isin(used_recipes)].sample(remaining_needed)
-            potential_recipes = pd.concat([potential_recipes, additional_recipes])
+        # If there are fewer than 5 recipes left after filtering, select as many as possible
+        if len(top_recipes) < 4:
+            top_recipes = data[~data["recipeid"].isin(used_recipes)].head(5)
 
-        # Track usage frequency across all meals
-        for recipe_id in potential_recipes["recipeid"]:
-            recipe_usage_count[recipe_id] = recipe_usage_count.get(recipe_id, 0) + 1
-
-        # Filter out recipes that have already been used too many times across meals
-        potential_recipes = potential_recipes[potential_recipes["recipeid"].map(lambda x: recipe_usage_count[x] <= 2)]
-
-        # Randomly shuffle selected recipes to ensure variety
-        selected_recipes = potential_recipes.sample(n=5, random_state=42)
-
-        # Add selected recipes' IDs to the used list
-        used_recipes.update(selected_recipes["recipeid"].tolist())
-
-        meal_plan[meal] = selected_recipes  # Store the full dataframe for each meal
+        # Add selected recipes to meal plan
+        meal_plan[meal] = top_recipes.head(4)
+        used_recipes.update(top_recipes["recipeid"])
 
     return meal_plan
 
 # Streamlit App
 st.title("Customized Nutrition System")
 st.write("This app generates a personalized meal plan based on your dietary needs and preferences.")
-# Add two <> tags below the title
 st.write("Here you can view the sample meal plan along with details such as calories and macro breakdown.")
 
 # Input form
@@ -186,10 +171,13 @@ if submit_button:
     bmi, bmi_category = calculate_bmi(weight, height)
     calorie_needs = calculate_calories(age, gender.lower(), weight, height, goal.lower())
 
-    # Generate Meal Plan and Visualize Results
-    meal_plan = generate_meal_plan(calorie_needs, data)
+    # Train Random Forest model (you could also train the model once on app startup)
+    model = train_random_forest_model(data)
 
-    # Always display results
+    # Generate Meal Plan using Random Forest
+    meal_plan = generate_meal_plan_rf(calorie_needs, data, model)
+
+    # Display BMI and Meal Plan
     st.subheader(f"CALCULATED BMI")
     st.markdown(f"<span style=' margin:0px; padding:0px; font-size:14px;'>Body Mass Index(BMI) </span>", unsafe_allow_html=True)
     st.markdown(f"<span style=' margin:0px; font-size:26px;'>{bmi:.2f} </span> kg/m²", unsafe_allow_html=True)
@@ -198,4 +186,4 @@ if submit_button:
     st.subheader("Generated Meal Plan")
     for meal, recipes in meal_plan.items():
         st.write(f"**{meal.capitalize()}**")
-        st.table(recipes[["name"]].head(5).reset_index(drop=True))
+        st.table(recipes[["name"]].reset_index(drop=True))  # Display only the recipe names
